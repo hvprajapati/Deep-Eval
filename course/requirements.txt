@@ -1,0 +1,8 @@
+deepeval
+groq
+langchain
+langchain-groq
+scikit-learn
+python-dotenv
+jupyter
+ipywidgets

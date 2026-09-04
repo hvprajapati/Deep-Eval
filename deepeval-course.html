@@ -1,0 +1,962 @@
+<title>AI Evaluation with DeepEval</title>
+
+<style>
+  :root {
+    --bg: #F5F3FA;
+    --surface: #FFFFFF;
+    --surface-2: #ECE8F6;
+    --ink: #1B1633;
+    --ink-2: #5A5572;
+    --ink-3: #8A85A3;
+    --accent: #6A00FF;
+    --accent-soft: #EEE8FF;
+    --pass: #178A43;
+    --fail: #C23A30;
+    --line: #E4E0F0;
+    --term-bg: #171226;
+    --term-dim: #8F89B5;
+    --term-ink: #D9D4EE;
+    --term-green: #4ADE80;
+    --term-red: #F87171;
+    --term-accent: #A78BFA;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12101C;
+      --surface: #1B1830;
+      --surface-2: #231E3D;
+      --ink: #ECE8F8;
+      --ink-2: #A9A4C4;
+      --ink-3: #7B7699;
+      --accent: #A06BFF;
+      --accent-soft: #2B2350;
+      --pass: #4CC479;
+      --fail: #FF8A80;
+      --line: #2C2650;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12101C;
+    --surface: #1B1830;
+    --surface-2: #231E3D;
+    --ink: #ECE8F8;
+    --ink-2: #A9A4C4;
+    --ink-3: #7B7699;
+    --accent: #A06BFF;
+    --accent-soft: #2B2350;
+    --pass: #4CC479;
+    --fail: #FF8A80;
+    --line: #2C2650;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+
+  /* ---------- hero ---------- */
+  .hero { display: grid; grid-template-columns: 1.35fr 1fr; gap: 48px; align-items: center; padding: 56px 0 40px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.72rem; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-weight: 600; font-size: clamp(1.7rem, 3.6vw, 2.7rem);
+    line-height: 1.12; letter-spacing: -0.01em;
+    margin: 0 0 16px; text-wrap: balance;
+  }
+  .thesis { color: var(--ink-2); font-size: 1.04rem; max-width: 58ch; margin: 0 0 22px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.72rem; color: var(--ink-2);
+    border: 1px solid var(--line); background: var(--surface);
+    border-radius: 4px; padding: 4px 10px;
+  }
+
+  .term {
+    background: var(--term-bg); border-radius: 8px;
+    padding: 18px 20px;
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.76rem; line-height: 1.75;
+    box-shadow: 0 12px 32px rgba(23, 18, 38, 0.22);
+  }
+  .term .bar { color: var(--term-dim); margin-bottom: 6px; }
+  .t-dim { color: var(--term-dim); }
+  .t-ink { color: var(--term-ink); }
+  .t-green { color: var(--term-green); }
+  .t-red { color: var(--term-red); }
+  .t-accent { color: var(--term-accent); }
+  .t-pad { padding-left: 1.4em; }
+
+  /* ---------- arc ---------- */
+  .arc { padding: 26px 0 8px; }
+  .arc-row {
+    display: grid; grid-template-columns: 110px 110px minmax(0, 1fr);
+    gap: 18px; align-items: baseline;
+    padding: 13px 4px; border-top: 1px solid var(--line);
+  }
+  .arc-row:last-child { border-bottom: 1px solid var(--line); }
+  .arc-mod, .arc-days {
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.74rem; color: var(--accent); letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  .arc-days { color: var(--ink-3); }
+  .arc-name { font-weight: 600; font-size: 0.97rem; }
+  .arc-blurb { color: var(--ink-2); font-size: 0.88rem; }
+
+  /* ---------- modules & days ---------- */
+  .module { padding: 34px 0 6px; }
+  .mod-eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.72rem; font-weight: 500; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 8px;
+  }
+  .mod-title { font-size: 1.35rem; font-weight: 600; margin: 0 0 6px; text-wrap: balance; }
+  .mod-blurb { color: var(--ink-2); font-size: 0.95rem; margin: 0; max-width: 72ch; }
+
+  .day {
+    display: grid; grid-template-columns: 196px minmax(0, 1fr) minmax(0, 1fr);
+    gap: 28px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 20px 24px; margin-top: 14px;
+  }
+  .day:hover { border-color: var(--accent); }
+  .day-id {
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.14em;
+    color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .day-title { font-weight: 600; font-size: 1.03rem; margin: 7px 0 0; text-wrap: balance; }
+  .day-nb {
+    display: inline-block; margin-top: 12px;
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.66rem; color: var(--ink-2);
+    border: 1px dashed var(--line); border-radius: 4px; padding: 2px 8px;
+  }
+  .col-label {
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.16em;
+    color: var(--ink-3); text-transform: uppercase; margin: 2px 0 8px;
+  }
+  .day ul { list-style: none; margin: 0; padding: 0; }
+  .day li { position: relative; padding-left: 16px; margin: 0 0 9px; font-size: 0.9rem; line-height: 1.55; }
+  .day li:last-child { margin-bottom: 0; }
+  .day li::before { content: "▸"; position: absolute; left: 0; color: var(--accent); font-size: 0.8rem; }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.82em; background: var(--surface-2);
+    border-radius: 4px; padding: 1px 5px;
+  }
+
+  /* ---------- notes ---------- */
+  .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; padding: 44px 0 12px; }
+  .notes h3 { font-size: 1.02rem; font-weight: 600; margin: 0 0 10px; }
+  .notes p, .notes li { color: var(--ink-2); font-size: 0.9rem; line-height: 1.6; }
+  .notes ul { margin: 0; padding-left: 18px; }
+  .notes li { margin-bottom: 7px; }
+
+  footer {
+    border-top: 1px solid var(--line); margin-top: 40px; padding: 22px 0 44px;
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.72rem; color: var(--ink-3);
+  }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; gap: 28px; padding-top: 40px; }
+    .day { grid-template-columns: 1fr; gap: 18px; }
+    .notes { grid-template-columns: 1fr; gap: 28px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <!-- ================= HERO ================= -->
+  <header class="hero">
+    <div>
+      <p class="eyebrow">DeepEval · LLM Evaluation Curriculum</p>
+      <h1>AI Evaluation with DeepEval</h1>
+      <p class="thesis">A 28-day course from your first <code>LLMTestCase</code> to evaluating RAG pipelines and multi-agent
+        systems. Every day has two columns: <strong>CODE</strong> — what students build and run — and
+        <strong>THEORY</strong> — what to explain before they touch it. Built to be taught straight from the
+        <code>notebook.ipynb</code> in this folder.</p>
+      <div class="chips">
+        <span class="chip">28 days</span>
+        <span class="chip">5 modules</span>
+        <span class="chip">Python 3.9+</span>
+        <span class="chip">Groq judge · free tier friendly</span>
+      </div>
+    </div>
+    <div class="term">
+      <div class="bar">$ python evals.py &nbsp;·&nbsp; 2 test cases</div>
+      <div><span class="t-dim">✨ Correctness [GEval] — llama-3.3-70b-versatile</span></div>
+      <div><span class="t-green">  ✅ test_case_0</span><span class="t-dim"> &nbsp;passed 2 metrics</span></div>
+      <div><span class="t-red">  ❌ test_case_1</span></div>
+      <div class="t-pad t-red">├ Correctness &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0.00 &lt; 0.50</div>
+      <div class="t-pad t-red">└ Professional Tone 0.20 &lt; 0.50</div>
+      <div><span class="t-accent">Pass rate: 50.0%</span> <span class="t-dim">· token cost: 0.0004</span></div>
+      <div class="t-dim">✓ Evaluation completed 🎉 (time taken: 1.49s)</div>
+    </div>
+  </header>
+
+  <!-- ================= ARC ================= -->
+  <section class="arc">
+    <div class="arc-row">
+      <span class="arc-mod">MODULE 01</span><span class="arc-days">DAYS 01–05</span>
+      <div><span class="arc-name">Foundations</span> — <span class="arc-blurb">test cases, LLM judges, and G-Eval: the loop everything else builds on.</span></div>
+    </div>
+    <div class="arc-row">
+      <span class="arc-mod">MODULE 02</span><span class="arc-days">DAYS 06–10</span>
+      <div><span class="arc-name">The Metric Toolkit</span> — <span class="arc-blurb">core metrics, pytest integration, custom metrics, and DAG decision trees.</span></div>
+    </div>
+    <div class="arc-row">
+      <span class="arc-mod">MODULE 03</span><span class="arc-days">DAYS 11–16</span>
+      <div><span class="arc-name">RAG Evaluation</span> — <span class="arc-blurb">measure retrieval and generation separately, then optimize against the scores.</span></div>
+    </div>
+    <div class="arc-row">
+      <span class="arc-mod">MODULE 04</span><span class="arc-days">DAYS 17–24</span>
+      <div><span class="arc-name">Agents &amp; Multi-Agent</span> — <span class="arc-blurb">traces, tool-call metrics, trajectory metrics, and multi-turn / multi-agent systems.</span></div>
+    </div>
+    <div class="arc-row">
+      <span class="arc-mod">MODULE 05</span><span class="arc-days">DAYS 25–28</span>
+      <div><span class="arc-name">Production &amp; Beyond</span> — <span class="arc-blurb">safety metrics, benchmarks, CI, and the Confident AI platform.</span></div>
+    </div>
+  </section>
+
+  <!-- ================= MODULE 01 ================= -->
+  <section class="module">
+    <p class="mod-eyebrow">Module 01 · Days 01–05</p>
+    <h2 class="mod-title">Foundations — the eval loop</h2>
+    <p class="mod-blurb">Students learn why LLM outputs can't be unit-tested, meet the test case and the judge, and write their first
+      G-Eval by the end of the week. The judge built on Day 3 is reused every day after.</p>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 01</span>
+        <h3 class="day-title">Why evaluate, and the eval loop</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>pip install deepeval</code> in a fresh venv; pin the version for the whole course.</li>
+          <li>Set <code>DEEPEVAL_TELEMETRY_OPT_OUT=YES</code> and confirm the import prints a version.</li>
+          <li>Call any LLM API twice with the same prompt — show students the output differs.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Why unit tests fail for probabilistic outputs — <code>assert answer == expected</code> dies on day one.</li>
+          <li>The eval loop: dataset → metric → threshold → pass/fail → regression when you change the app.</li>
+          <li>Where DeepEval sits: deepeval vs RAGAS, LangSmith, promptfoo — open-source, judge-based, framework-agnostic.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 02</span>
+        <h3 class="day-title">LLMTestCase — the unit of evaluation</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Build <code>LLMTestCase</code> with <code>input</code>, <code>actual_output</code>, <code>expected_output</code>.</li>
+          <li>Add <code>context</code> and <code>retrieval_context</code> variants; print each field.</li>
+          <li>Load cases from a small JSON list — the first golden dataset.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Anatomy of a test case: which metric consumes which field.</li>
+          <li>Golden datasets — curated input/expected pairs that never leave the repo.</li>
+          <li>When <code>expected_output</code> is optional, and why some metrics never look at it.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 03</span>
+        <h3 class="day-title">Judges — the LLM behind the score</h3>
+        <span class="day-nb">notebook · G-Eval section</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Wrap a Groq model with <code>LocalModel(model="llama-3.3-70b-versatile", base_url=…)</code> — the course judge.</li>
+          <li>Variants: OpenAI, Azure OpenAI, Gemini, Ollama — all through <code>DeepEvalBaseLLM</code>.</li>
+          <li>Set <code>temperature=0</code> and call <code>judge.get_model_name()</code> to verify.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>LLM-as-judge: a model that scores another model's output.</li>
+          <li>Judge consistency and bias — always temperature 0, log which judge scored which run.</li>
+          <li>Cheap judge vs capable judge: an 8B can score tone; factual correctness wants more.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 04</span>
+        <h3 class="day-title">Running your first evaluation</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>evaluate(test_cases, metrics=[…])</code> with one metric on two cases — one passing, one failing.</li>
+          <li>Set <code>threshold=0.5</code>; read the pass/fail table and aggregate metrics.</li>
+          <li>Parse <code>results.test_results</code> and <code>metric_scores</code> as Python objects.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Every metric returns three things: <strong>score</strong> (0–1), <strong>reason</strong>, <strong>verdict</strong>.</li>
+          <li>Thresholds turn continuous scores into pass/fail — your product decision, not a default.</li>
+          <li>Reading the aggregate table: average score, pass rate, per-metric totals.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 05</span>
+        <h3 class="day-title">G-Eval — metrics you write in English</h3>
+        <span class="day-nb">notebook · G-Eval section</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>GEval(name, criteria, evaluation_steps=[…], evaluation_params=[SingleTurnParams.…])</code>.</li>
+          <li>Add a <code>Rubric</code> with score bands (0–2, 3–5, 6–8, 9–10) for graded output.</li>
+          <li>Run Correctness + Professional Tone side by side — the notebook's refund-policy cases.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Generation-based evaluation: the judge thinks through steps, then scores.</li>
+          <li>What <code>evaluation_steps</code> and rubrics compile to — they are the prompt.</li>
+          <li>Why G-Eval beats regex/string matching, and when to reach for it.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MODULE 02 ================= -->
+  <section class="module">
+    <p class="mod-eyebrow">Module 02 · Days 06–10</p>
+    <h2 class="mod-title">The metric toolkit</h2>
+    <p class="mod-blurb">The built-in metrics, evals as pytest tests, and the two ways to build your own: custom classes and DAG
+      decision trees.</p>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 06</span>
+        <h3 class="day-title">Faithfulness, Hallucination &amp; Answer Relevancy</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>FaithfulnessMetric</code> on answers with and without <code>retrieval_context</code>.</li>
+          <li><code>HallucinationMetric</code> on an answer that invents facts.</li>
+          <li><code>AnswerRelevancyMetric</code> on a rambling answer that buries the actual response.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Faithfulness extracts claims from the answer and checks each against the context.</li>
+          <li>Hallucination detects contradictions — the fluent-but-wrong failure mode.</li>
+          <li>Relevancy: how much of the output actually answers the question.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 07</span>
+        <h3 class="day-title">Summarization, JSON &amp; score-only mode</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>SummarizationMetric</code> on long vs short summaries of one text.</li>
+          <li><code>JsonCorrectnessMetric</code> with <code>expected_schema</code> on valid and malformed JSON.</li>
+          <li>Score-only (<code>threshold=None</code>) and <code>flaky=True</code> metrics — which verdicts get suppressed.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Reference-free metrics: what they compare against when there's no expected output.</li>
+          <li>Flaky metrics score but never decide pass/fail — useful for noisy judges in CI.</li>
+          <li>Every metric's judge prompt can be overridden with <code>evaluation_template</code>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 08</span>
+        <h3 class="day-title">Evals as tests — pytest + deepeval test run</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Write <code>tests/test_chatbot.py</code> with <code>assert_test</code> inside plain test functions.</li>
+          <li>Parametrize with <code>@pytest.mark.parametrize</code> over the golden dataset.</li>
+          <li>Run <code>deepeval test run tests/</code> from the CLI and read the exit code.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Why evals belong in CI: every prompt or model change runs the whole pack.</li>
+          <li>Pytest fixtures: build the judge once per session, reuse across every test.</li>
+          <li>Test hygiene — deterministic cases, small packs, short CI budgets.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 09</span>
+        <h3 class="day-title">Custom metrics</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Subclass <code>DeepEvalBaseMetric</code> for a deterministic metric (e.g. word-count ceiling).</li>
+          <li>Then a judge-based custom metric using <code>async_mode=True</code> and <code>a_measure()</code>.</li>
+          <li>Return <code>self.score</code>, <code>self.reason</code>, and let <code>is_successful()</code> use the threshold.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>The metric contract: score + reason + verdict, nothing else.</li>
+          <li>Sync vs async metrics and why custom metrics should be async by default.</li>
+          <li>When to hand-write a metric vs use G-Eval — determinism vs flexibility.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 10</span>
+        <h3 class="day-title">DAG metrics — decision-tree evaluation</h3>
+        <span class="day-nb">notebook · DAG section (incl. its 2 bug patches)</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Build <code>DAGMetric</code> from <code>TaskNode</code> → <code>BinaryJudgementNode</code> → <code>VerdictNode</code>.</li>
+          <li>The notebook's heading-order example: extract headings, gate on presence, then score order.</li>
+          <li>Reuse the notebook's two monkey-patches if your DeepEval version hits the DAG template bugs.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>When criteria are a procedure, not prose — DAG encodes branching logic.</li>
+          <li>Node types: tasks extract, judgements gate, verdicts score — and how scores flow down branches.</li>
+          <li>DAG vs G-Eval: objective or mixed criteria belong in a graph, not a prompt.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MODULE 03 ================= -->
+  <section class="module">
+    <p class="mod-eyebrow">Module 03 · Days 11–16</p>
+    <h2 class="mod-title">RAG evaluation</h2>
+    <p class="mod-blurb">The heart of the course. Students build a small RAG, measure its retriever and generator separately with
+      DeepEval's five RAG metrics, then improve it against the scores.</p>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 11</span>
+        <h3 class="day-title">Anatomy of a RAG you can evaluate</h3>
+        <span class="day-nb">notebook · RAG section</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>A tiny 5-document corpus (tokens, embeddings, RAG, hallucination, agents).</li>
+          <li>A naive keyword-overlap retriever returning top-<code>k</code> chunks.</li>
+          <li>A Groq answer function with the "answer ONLY using the provided context" prompt.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Index → retrieve → generate: three components, three failure points.</li>
+          <li>Why retrieval and generation must be evaluated separately.</li>
+          <li>Golden datasets for RAG: question + expected answer + which docs should come back.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 12</span>
+        <h3 class="day-title">Contextual Precision — is the ranking right?</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>ContextualPrecisionMetric</code> on retrieved node lists.</li>
+          <li>Inspect <code>verbose_logs</code> to see the judge walk node by node.</li>
+          <li>Compare: correct chunk first vs correct chunk buried at position 3.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Precision is about <em>order</em>: the answer may be in there, but does it rank first?</li>
+          <li>How the judge scores each node against the question and prior nodes.</li>
+          <li>Why ranking matters — top-k truncation silently drops lower nodes.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 13</span>
+        <h3 class="day-title">Contextual Recall &amp; Relevancy</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>ContextualRecallMetric</code> with <code>expected_output</code> as the answer to cover.</li>
+          <li><code>ContextualRelevancyMetric</code> — add a noise doc and watch the score drop.</li>
+          <li>Run all three retriever metrics on the same cases in one <code>evaluate()</code>.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Recall: is the information needed to produce the expected answer anywhere in the nodes?</li>
+          <li>Relevancy: signal-to-noise — how many retrieved chunks are actually used?</li>
+          <li>Reading recall and precision together: coverage vs ranking are different diseases.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 14</span>
+        <h3 class="day-title">Generator metrics — Faithfulness &amp; Answer Relevancy</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Generate real answers with the Day-11 pipeline for the three notebook questions.</li>
+          <li><code>FaithfulnessMetric</code> and <code>AnswerRelevancyMetric</code> on each answer.</li>
+          <li>Watch the out-of-corpus Docker question — the model should refuse, not invent.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Grounding: faithfulness checks the answer against retrieved context only.</li>
+          <li>Helpfulness: relevancy checks the answer against the question.</li>
+          <li>What the "answer only from context" prompt does to both scores — and why refusal is correct behavior.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 15</span>
+        <h3 class="day-title">The full RAG report</h3>
+        <span class="day-nb">notebook · RAG section (the 5-metric run)</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Run all five RAG metrics together — ~41 judge calls on 3 cases.</li>
+          <li>Add <code>AsyncConfig(max_concurrent, throttle_value)</code> and <code>ErrorConfig(skip_on_missing_params=True)</code>.</li>
+          <li>Write a one-paragraph failure analysis for each failing case.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Diagnosing failures: is it the retriever (precision/recall) or the generator (faithfulness/relevancy)?</li>
+          <li>Mapping scores to fixes — a recall problem is chunking, a relevancy problem is the query.</li>
+          <li>Why the notebook's token question failed: keyword overlap can't do semantics.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 16</span>
+        <h3 class="day-title">Evaluation-driven RAG improvements</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Replace the keyword retriever with embedding similarity (or tune <code>k</code>).</li>
+          <li>Re-run the Day-15 suite; diff average scores and pass rates before/after.</li>
+          <li>Add 3 new questions to the golden set and re-evaluate both retrievers.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>The optimize loop: hypothesis → change → re-evaluate → keep or revert.</li>
+          <li>Synthetic test generation: derive new test cases from your own documents.</li>
+          <li>Regression packs — the old suite is the safety net for every improvement.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MODULE 04 ================= -->
+  <section class="module">
+    <p class="mod-eyebrow">Module 04 · Days 17–24</p>
+    <h2 class="mod-title">Agents &amp; multi-agent systems</h2>
+    <p class="mod-blurb">Non-deterministic agents need traces before metrics. Students build a tool-using agent, evaluate its tool
+      calls and its full trajectory, then extend to multi-turn and multi-agent systems.</p>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 17</span>
+        <h3 class="day-title">LLM tracing</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>@observe(type="tool")</code> on a function; call it and print the trace tree.</li>
+          <li>Wrap a whole run in <code>trace()</code> and inspect <code>root_spans</code>.</li>
+          <li>Set <code>CONFIDENT_TRACE_VERBOSE=0</code> to silence dev logging.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Spans and traces: every tool call, prompt, and output as a tree.</li>
+          <li>Why agents need traces before metrics — two identical answers can hide very different runs.</li>
+          <li>Tracing = observability for non-deterministic systems.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 18</span>
+        <h3 class="day-title">Build a tool-using agent</h3>
+        <span class="day-nb">notebook · Agent section</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Three <code>@tool</code>s: <code>search_docs</code>, <code>run_code</code>, <code>escalate_to_human</code> — each wrapped in <code>@observe</code>.</li>
+          <li>LangChain <code>create_agent(llm, tools, system_prompt)</code> with <code>ChatGroq</code>.</li>
+          <li>Run it: "run print(2**10)" should call exactly one tool.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>The agent loop: plan → act (call a tool) → observe → decide → repeat.</li>
+          <li>Tool schemas are the agent's action space; descriptions are its only documentation.</li>
+          <li>Frameworks: LangChain, LangGraph, Pydantic AI — DeepEval works with all of them.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 19</span>
+        <h3 class="day-title">Traces → agent test cases</h3>
+        <span class="day-nb">notebook · Agent section</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Run the agent on 3 tasks; capture <code>tools_called</code> and the trace dict per run.</li>
+          <li>Build <code>LLMTestCase</code>s with <code>expected_tools=[ToolCall(name=…)]</code>.</li>
+          <li>Attach the trace via <code>test_case._trace_dict = …</code> — trajectory metrics need it.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>What a trajectory test case needs: the output, the tool calls, and the full trace.</li>
+          <li><code>expected_tools</code> encodes intent — "this task should need a docs search".</li>
+          <li>Capturing traces programmatically so evals run anywhere, not just in the notebook.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 20</span>
+        <h3 class="day-title">Action metrics — judging single tool calls</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>ToolCorrectnessMetric</code> on the 3 cases — right tool for the intent?</li>
+          <li><code>ArgumentCorrectnessMetric</code> — right arguments for that tool?</li>
+          <li>Check <code>verbose_logs</code> to see which call each score is judging.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Component-level evaluation: judge one decision at a time, not the whole run.</li>
+          <li>Why actions are judged before outcomes — a right answer reached by the wrong path is still a bug.</li>
+          <li>Tool correctness catches the escalate-vs-search mistakes no output metric can see.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 21</span>
+        <h3 class="day-title">Trajectory metrics — judging the whole run</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>TaskCompletionMetric</code> — did the goal get reached?</li>
+          <li><code>PlanAdherenceMetric</code> + <code>PlanQualityMetric</code> — was the plan good, and was it followed?</li>
+          <li><code>StepEfficiencyMetric</code> — were the steps economical?</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>A trajectory is the ordered chain of decisions — right tools in the wrong order is still a failure.</li>
+          <li>Completion scores the destination; adherence, quality, and efficiency score the path.</li>
+          <li>Why one metric is never enough for an agent — read the four together.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 22</span>
+        <h3 class="day-title">The full agent report</h3>
+        <span class="day-nb">notebook · Agent section (the 6-metric run)</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Run all six agent metrics in one <code>evaluate()</code> with a light throttle (~18 judge calls).</li>
+          <li>Analyze the notebook's failure: 9× <code>search_docs</code> calls for one question.</li>
+          <li>Fix it — cap iterations or improve tool descriptions — and re-run to show the delta.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Reading agent failures: tool choice (Day 20) vs plan vs efficiency (Day 21).</li>
+          <li>Loop bugs are efficiency failures — tracing them to fixes like max-iteration caps.</li>
+          <li>The complete agent harness is a template: swap the agent, keep the suite.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 23</span>
+        <h3 class="day-title">Multi-turn chatbots</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Build <code>ConversationalTestCase</code> with a <code>messages</code> list.</li>
+          <li><code>KnowledgeRetentionMetric</code> and <code>RoleAdherenceMetric</code> on a forgetful bot.</li>
+          <li><code>ConversationCompletenessMetric</code> + <code>ConversationRelevancyMetric</code> on the same dialogue.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Conversations are evaluated as a whole, not turn by turn.</li>
+          <li>Memory metrics: did the bot keep facts from turn 1, and stay in character?</li>
+          <li>When a chatbot suite beats single-turn cases — any app with session state.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 24</span>
+        <h3 class="day-title">Multi-agent systems</h3>
+        <span class="day-nb">new material — extends the notebook</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>A small LangGraph setup: supervisor agent + one worker agent with its own tools.</li>
+          <li>Trace the whole system; identify each sub-agent's spans in the tree.</li>
+          <li>Evaluate end-to-end, then attach component metrics per agent span for blame attribution.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>What multi-agent adds: handoffs, parallel workers, separation of roles — and new failure modes.</li>
+          <li>Evaluate each agent in isolation <em>and</em> end-to-end; the handoff itself is testable.</li>
+          <li>Traces make blame attribution possible — which agent broke the chain?</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MODULE 05 ================= -->
+  <section class="module">
+    <p class="mod-eyebrow">Module 05 · Days 25–28</p>
+    <h2 class="mod-title">Production &amp; beyond</h2>
+    <p class="mod-blurb">Safety guardrails, benchmarks, CI integration, and the platform layer. The course ends with a capstone:
+      one end-to-end suite for everything built so far.</p>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 25</span>
+        <h3 class="day-title">Safety metrics</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li><code>BiasMetric</code>, <code>ToxicityMetric</code>, <code>MisuseMetric</code> on adversarial cases.</li>
+          <li><code>NonAdviceMetric</code> (medical/legal) and <code>PIILeakageMetric</code> with a fake dataset.</li>
+          <li><code>RoleViolationMetric</code> — the bot must stay a bot.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Guardrail evals: safety scores are separate from quality scores and gate separately.</li>
+          <li>Adversarial packs stay red-team-style, out of the main golden dataset.</li>
+          <li>Thresholds here are policy decisions, not accuracy targets.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 26</span>
+        <h3 class="day-title">Benchmarks &amp; multimodal</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Run a small HellaSwag subset via <code>deepeval.benchmarks</code>.</li>
+          <li>One <code>ImageCoherenceMetric</code> case with <code>MLLMImage</code>.</li>
+          <li>Compare the benchmark score with your own suite's score on the same model.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Public benchmarks measure the model, not your app — both matter, never conflate them.</li>
+          <li>What benchmarks hide: your prompts, your context, your users.</li>
+          <li>The image metric family (coherence, helpfulness, reference, editing) and when multimodality enters evals.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 27</span>
+        <h3 class="day-title">Evals in production</h3>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Export and import the course's test cases as a dataset (<code>.json</code> round-trip).</li>
+          <li>A GitHub Actions step running <code>deepeval test run tests/</code> on every PR.</li>
+          <li>Log hyperparameters (prompt version, model, temperature) alongside each run.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>Regression packs: the suite is a contract — any change that drops it gets caught.</li>
+          <li>CI gates with flaky metrics, budgets, and caching judges.</li>
+          <li>Track cost and latency next to scores — a 2% quality win that doubles cost is a decision.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="day">
+      <div>
+        <span class="day-id">DAY 28</span>
+        <h3 class="day-title">Capstone + Confident AI</h3>
+        <span class="day-nb">notebook · deepeval view cell</span>
+      </div>
+      <div>
+        <p class="col-label">Code</p>
+        <ul>
+          <li>Assemble everything into one end-to-end suite: RAG pipeline + agent + safety pack.</li>
+          <li><code>deepeval view</code> to push results to Confident AI and open the dashboard.</li>
+          <li>Students demo: a failing case, its trace, its fix, and the green re-run.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="col-label">Theory</p>
+        <ul>
+          <li>The full loop: build → evaluate → trace → fix → ship → watch.</li>
+          <li>Confident AI: dashboards, regression testing, and team-wide visibility of scores.</li>
+          <li>Next step: red teaming with DeepTeam — evals find bugs, red teaming finds the bugs you didn't think to test.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= NOTES ================= -->
+  <section class="notes">
+    <div>
+      <h3>Notebook map</h3>
+      <ul>
+        <li><strong>G-Eval section</strong> → Days 03–05: the Groq judge and both G-Eval metrics are reused almost every day after.</li>
+        <li><strong>DAG section</strong> → Day 10: keep the two monkey-patches with it — some DeepEval versions still need them.</li>
+        <li><strong>RAG section</strong> → Days 11–15: corpus, retriever, pipeline, and the 5-metric run map one-to-one.</li>
+        <li><strong>Agent section</strong> → Days 17–22: tools, <code>create_agent</code>, traces, and the 6-metric run.</li>
+        <li>Define the judge once on Day 3 (<code>llama-3.3-70b-versatile</code> via Groq) and import it everywhere.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Teaching tips</h3>
+      <ul>
+        <li>Every day ends with at least one failing case — students read the <em>reason</em> before they touch a fix.</li>
+        <li>Keep one golden dataset growing from Module 03 onward; it becomes the capstone's regression pack.</li>
+        <li>Stay on the tiny 5-doc corpus and light throttles — the whole course runs on a free Groq key.</li>
+        <li>Days 16 and 22 are the payoff days: change one thing, watch the scores move, explain why.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <span class="mono">AI EVALUATION WITH DEEPEVAL · 28 DAYS · 5 MODULES · designed to be taught alongside notebook.ipynb</span>
+  </footer>
+
+</div>
